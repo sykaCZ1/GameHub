@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Snake Game</title>
+<style>
+body{
+  margin:0;
+  font-family:'Segoe UI',sans-serif;
+  background: linear-gradient(135deg,#0f172a,#1e293b);
+  color:white;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  padding:20px;
+}
+
+header{
+  font-size:32px;
+  margin-bottom:10px;
+  text-shadow: 2px 2px 6px #000;
+}
+
+canvas{
+  background:#111827;
+  border:3px solid #3b82f6;
+  border-radius:12px;
+}
+
+.scoreboard{
+  margin:10px;
+  font-size:20px;
+  color:#38bdf8;
+}
+
+button{
+  margin:5px;
+  padding:10px 20px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(45deg,#3b82f6,#06b6d4);
+  color:white;
+  font-weight:bold;
+  cursor:pointer;
+  transition:0.2s;
+}
+button:hover{
+  transform:scale(1.05);
+}
+</style>
+</head>
+<body>
+
+<header>🐍 Mini Snake</header>
+
+<div class="scoreboard">
+Score: <span id="score">0</span> | High Score: <span id="highscore">0</span>
+</div>
+
+<canvas id="game" width="400" height="400"></canvas>
+
+<div>
+  <button onclick="startGame()">Start / Restart</button>
+  <button onclick="goMenu()">⬅️ Zpět do menu</button>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let snake = [];
+let direction = 'RIGHT';
+let food = {};
+let score = 0;
+let highscore = Number(localStorage.getItem("snake_highscore")) || 0;
+let gameInterval;
+let blockSize = 20;
+
+document.getElementById("highscore").innerText = highscore;
+
+// --- Game Functions ---
+function startGame(){
+    clearInterval(gameInterval);
+    snake = [{x:200,y:200}];
+    direction='RIGHT';
+    score=0;
+    spawnFood();
+    updateScore();
+    gameInterval = setInterval(gameLoop, 150);
+}
+
+function spawnFood(){
+    let cols = canvas.width/blockSize;
+    let rows = canvas.height/blockSize;
+    food = {
+        x: Math.floor(Math.random()*cols)*blockSize,
+        y: Math.floor(Math.random()*rows)*blockSize
+    };
+}
+
+function updateScore(){
+    document.getElementById("score").innerText = score;
+    document.getElementById("highscore").innerText = highscore;
+}
+
+function gameLoop(){
+    moveSnake();
+    if(checkCollision()){
+        clearInterval(gameInterval);
+        alert("Konec hry! Tvoje skóre: " + score);
+        if(score > highscore){
+            highscore = score;
+            localStorage.setItem("snake_highscore",highscore);
+        }
+        updateScore();
+        return;
+    }
+    draw();
+}
+
+function moveSnake(){
+    let head = {...snake[0]};
+    if(direction==='RIGHT') head.x += blockSize;
+    if(direction==='LEFT') head.x -= blockSize;
+    if(direction==='UP') head.y -= blockSize;
+    if(direction==='DOWN') head.y += blockSize;
+
+    snake.unshift(head);
+
+    // jestli snědl jídlo
+    if(head.x === food.x && head.y === food.y){
+        score++;
+        if(score>highscore) highscore = score;
+        spawnFood();
+    } else {
+        snake.pop();
+    }
+    updateScore();
+}
+
+function checkCollision(){
+    let head = snake[0];
+    // stěny
+    if(head.x<0 || head.x>=canvas.width || head.y<0 || head.y>=canvas.height) return true;
+    // vlastní tělo
+    for(let i=1;i<snake.length;i++){
+        if(head.x === snake[i].x && head.y === snake[i].y) return true;
+    }
+    return false;
+}
+
+function draw(){
+    ctx.fillStyle="#111827";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // jídlo
+    ctx.fillStyle="#f59e0b";
+    ctx.fillRect(food.x,food.y,blockSize,blockSize);
+
+    // had
+    snake.forEach((segment,i)=>{
+        ctx.fillStyle=i===0?"#3b82f6":"#2563eb";
+        ctx.fillRect(segment.x,segment.y,blockSize,blockSize);
+    });
+}
+
+// --- Controls ---
+document.addEventListener("keydown",(e)=>{
+    if(e.key==='ArrowUp' && direction!=='DOWN') direction='UP';
+    if(e.key==='ArrowDown' && direction!=='UP') direction='DOWN';
+    if(e.key==='ArrowLeft' && direction!=='RIGHT') direction='LEFT';
+    if(e.key==='ArrowRight' && direction!=='LEFT') direction='RIGHT';
+});
+
+function goMenu(){ window.location.href="index.html"; }
+</script>
+
+</body>
+</html>

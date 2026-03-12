@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prší vs Počítač</title>
+<style>
+body{
+margin:0;
+font-family:'Segoe UI',sans-serif;
+background:#0a2540; /* tmavě modré pozadí */
+color:white;
+display:flex;
+flex-direction:column;
+align-items:center;
+padding:20px;
+}
+h1{ text-shadow:2px 2px 6px #000; }
+.hand, .computerHand{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin:10px 0; }
+.card{ width:60px; height:90px; background:white; color:black; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:bold; cursor:pointer; user-select:none; transition:0.2s; }
+.card:hover{ transform:scale(1.1); }
+#discardPile{ width:60px; height:90px; background:#f59e0b; border-radius:8px; display:flex; align-items:center; justify-content:center; margin:10px; font-weight:bold; }
+button{ margin-top:15px; padding:10px 20px; border:none; border-radius:12px; background:linear-gradient(45deg,#3b82f6,#06b6d4); color:white; font-weight:bold; cursor:pointer; transition:0.2s; }
+button:hover{ transform:scale(1.05); }
+.scoreboard{ margin-top:10px; font-size:18px; color:#facc15; }
+</style>
+</head>
+<body>
+
+<h1>🃏 Prší vs Počítač</h1>
+<div class="scoreboard" id="status"></div>
+<div id="gameArea">
+<h3>Počítač</h3>
+<div class="computerHand" id="computerHand"></div>
+
+<h3>Hromádka</h3>
+<div id="discardPile"></div>
+
+<h3>Tvá ruka</h3>
+<div class="hand" id="playerHand"></div>
+
+<button id="drawButton">Dobrat kartu</button>
+</div>
+
+<button onclick="goMenu()">⬅️ Zpět do menu</button>
+
+<script>
+const suits=["♥","♦","♠","♣"];
+const values=["7","8","9","10","J","Q","K","A"];
+let deck=[], discard=[], playerHand=[], computerHand=[];
+let skipPlayer=false, skipComputer=false, currentTurn="player";
+
+function shuffle(array){ return array.sort(()=>Math.random()-0.5); }
+
+function createDeck(){
+deck=[]; discard=[];
+for(let s of suits){ for(let v of values){ deck.push({suit:s,value:v,name:v+s}); } }
+deck=shuffle(deck);
+}
+
+function drawCard(hand,count=1){
+for(let i=0;i<count;i++){
+if(deck.length===0){
+if(discard.length>0){
+let top=discard.pop();
+deck=shuffle(discard);
+discard=[top];
+} else break;
+}
+hand.push(deck.pop());
+}
+}
+
+function startGame(){
+createDeck();
+playerHand=[]; computerHand=[];
+drawCard(playerHand,4); drawCard(computerHand,4);
+discard.push(deck.pop());
+currentTurn="player";
+skipPlayer=false; skipComputer=false;
+updateDisplay();
+updateStatus("Hra začíná! Tvůj tah.");
+}
+
+function updateDisplay(){
+const playerDiv=document.getElementById("playerHand");
+const compDiv=document.getElementById("computerHand");
+const discardDiv=document.getElementById("discardPile");
+playerDiv.innerHTML="";
+playerHand.forEach((c,i)=>{
+const card=document.createElement("div"); card.className="card"; card.innerText=c.name;
+card.onclick=()=>playCard(i);
+playerDiv.appendChild(card);
+});
+compDiv.innerHTML="";
+computerHand.forEach(c=>{
+const back=document.createElement("div"); back.className="card"; back.innerText="🂠";
+compDiv.appendChild(back);
+});
+discardDiv.innerText=discard[discard.length-1].name;
+}
+
+function isValidPlay(card){
+const top=discard[discard.length-1];
+return card.suit===top.suit || card.value===top.value;
+}
+
+function handleSpecial(card,player){
+if(card.value==="7"){
+if(player==="player"){
+drawCard(computerHand,2);
+updateStatus("Sedmička! Počítač bere 2 karty!");
+} else {
+drawCard(playerHand,2);
+updateStatus("Počítač hrál sedmičku! Vy bereš 2 karty!");
+}
+}
+
+if(card.value==="A"){
+if(player==="player"){ skipComputer=true; updateStatus("Eso! Počítač vynechá kolo a ty hraješ znovu."); currentTurn="player"; }
+else { skipPlayer=true; updateStatus("Vynecháš kolo!"); }
+}
+}
+
+function playCard(index){
+if(currentTurn!=="player" || skipPlayer) return;
+const card=playerHand[index];
+if(!isValidPlay(card)){ updateStatus("Neplatná karta!"); return; }
+
+discard.push(card); playerHand.splice(index,1);
+handleSpecial(card,"player");
+updateDisplay(); checkWin();
+
+if(card.value!=="A"){ currentTurn="computer"; setTimeout(computerTurn,500); }
+}
+
+function computerTurn(){
+if(skipComputer){ skipComputer=false; currentTurn="player"; updateStatus("Tvůj tah (počítač vynechal)."); return; }
+
+let played=false;
+for(let i=0;i<computerHand.length;i++){
+if(isValidPlay(computerHand[i])){
+const card=computerHand[i]; discard.push(card); computerHand.splice(i,1);
+handleSpecial(card,"computer"); played=true; updateStatus("Počítač hrál "+card.name+"!"); break;
+}
+}
+if(!played){ drawCard(computerHand,1); updateStatus("Počítač si dobírá kartu."); }
+updateDisplay(); checkWin(); currentTurn="player";
+}
+
+document.getElementById("drawButton").onclick=function(){
+if(currentTurn==="player"){
+drawCard(playerHand,1); updateDisplay(); updateStatus("Dobral jste kartu."); currentTurn="computer"; setTimeout(computerTurn,500);
+}
+}
+
+function checkWin(){
+if(playerHand.length===0){ alert("Vyhrál jsi!"); startGame(); }
+if(computerHand.length===0){ alert("Počítač vyhrál!"); startGame(); }
+}
+
+function updateStatus(text){ document.getElementById("status").innerText=text; }
+function goMenu(){ window.location.href="index.html"; }
+
+startGame();
+</script>
+
+</body>
+</html>

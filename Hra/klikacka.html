@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Klikací Hra</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            background: #0d1b3d; /* tmavě modré */
+            color: #fff;
+        }
+        button { 
+            margin: 5px; 
+            padding: 10px 20px; 
+            font-size: 16px; 
+            cursor: pointer;
+        }
+        .panel { margin: 20px; }
+        .budova { margin: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Klikací Hra</h1>
+
+    <div class="panel">
+        <h2>Peníze: <span id="penize">0</span> mincí</h2>
+        <h2>Krystaly: <span id="krystaly">0</span></h2>
+        <h2>Security: <span id="security">0</span></h2>
+    </div>
+
+    <div class="panel">
+        <button id="klikBtn">Klikni!</button>
+    </div>
+
+    <div class="panel">
+        <h3>Budovy:</h3>
+        <div class="budova">
+            <button onclick="koupitBudovu('Farma')">Koupit Farmu (+1/klik)</button>
+            Cena: <span id="cenaFarma">50</span>
+        </div>
+        <div class="budova">
+            <button onclick="koupitBudovu('Tovarna')">Koupit Továrnu (+10/klik)</button>
+            Cena: <span id="cenaTovarna">500</span>
+        </div>
+        <div class="budova">
+            <button onclick="koupitBudovu('Banka')">Koupit Banku (+100/klik)</button>
+            Cena: <span id="cenaBanka">5000</span>
+        </div>
+    </div>
+
+    <div class="panel">
+        <button onclick="koupitSecurity()">Koupit Security (1 krystal)</button>
+        <button onclick="resetHru()">Reset hry</button>
+        <button onclick="window.location.href='index.html'">Zpět do menu</button>
+    </div>
+
+    <script>
+        let penize = 0;
+        let krystaly = 0;
+        let security = 0;
+
+        let budovy = {
+            'Farma': {pocet: 0, cena: 50, bonus: 1},
+            'Tovarna': {pocet: 0, cena: 500, bonus: 10},
+            'Banka': {pocet: 0, cena: 5000, bonus: 100}
+        };
+
+        const klikBtn = document.getElementById('klikBtn');
+        const penizeEl = document.getElementById('penize');
+        const krystalyEl = document.getElementById('krystaly');
+        const securityEl = document.getElementById('security');
+
+        let kradezInterval = 60000; // 1 minuta
+        let kradezTimer = kradezInterval;
+
+        function aktualizujDisplay() {
+            penizeEl.textContent = Math.floor(penize);
+            krystalyEl.textContent = krystaly;
+            securityEl.textContent = security;
+
+            document.getElementById('cenaFarma').textContent = budovy['Farma'].cena;
+            document.getElementById('cenaTovarna').textContent = budovy['Tovarna'].cena;
+            document.getElementById('cenaBanka').textContent = budovy['Banka'].cena;
+        }
+
+        function ziskBonus() {
+            let bonus = 0;
+            for (let key in budovy) {
+                bonus += budovy[key].bonus * budovy[key].pocet;
+            }
+            return bonus;
+        }
+
+        klikBtn.addEventListener('click', () => {
+            penize += 1 + ziskBonus();
+            kontrolaMilion();
+            aktualizujDisplay();
+        });
+
+        function koupitBudovu(jmeno) {
+            let budova = budovy[jmeno];
+            if (penize >= budova.cena) {
+                penize -= budova.cena;
+                budova.pocet++;
+                budova.cena *= 2;
+                aktualizujDisplay();
+            } else {
+                alert("Nemáš dost peněz!");
+            }
+        }
+
+        function kontrolaMilion() {
+            if (penize >= 1000000) {
+                penize -= 1000000;
+                krystaly++;
+                alert("Gratulujeme! Získal jsi krystal!");
+            }
+        }
+
+        function koupitSecurity() {
+            if (krystaly > 0) {
+                krystaly--;
+                security++;
+                aktualizujDisplay();
+                alert("Security zakoupena! Krádeže se odloží o 1 minutu.");
+            } else {
+                alert("Nemáš krystal!");
+            }
+        }
+
+        function resetHru() {
+            if (confirm("Opravdu chceš resetovat hru?")) {
+                penize = 0;
+                krystaly = 0;
+                security = 0;
+                for (let key in budovy) {
+                    if (key === 'Farma') budovy[key].cena = 50;
+                    if (key === 'Tovarna') budovy[key].cena = 500;
+                    if (key === 'Banka') budovy[key].cena = 5000;
+                    budovy[key].pocet = 0;
+                }
+                kradezTimer = kradezInterval;
+                aktualizujDisplay();
+            }
+        }
+
+        // Automatická krádež
+        setInterval(() => {
+            kradezTimer -= 1000;
+            if (kradezTimer <= 0) {
+                if (security > 0) {
+                    security--;
+                    alert("Security tě ochránilo před krádeží!");
+                } else if (penize > 0) {
+                    let ukradeno = penize * 0.15;
+                    penize -= ukradeno;
+                    alert(`Krádež! Ztraceno ${Math.floor(ukradeno)} mincí!`);
+                }
+                kradezTimer = kradezInterval;
+                aktualizujDisplay();
+            }
+        }, 1000); // kontrola každou sekundu
+
+        // Inicializace
+        aktualizujDisplay();
+    </script>
+</body>
+</html>

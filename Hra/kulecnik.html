@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kulečník PvC</title>
+<style>
+body{
+  margin:0;
+  font-family:'Segoe UI',sans-serif;
+  background:linear-gradient(135deg,#0f172a,#1e293b);
+  color:white;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:10px;
+}
+header{ font-size:32px; margin:10px; text-shadow:2px 2px 6px #000; }
+canvas{ background:#064e3b; border:5px solid #3b82f6; border-radius:12px; margin-top:10px; }
+.scoreboard{ margin:10px; font-size:20px; color:#38bdf8; }
+button{ margin:5px; padding:8px 16px; border:none; border-radius:10px; background:linear-gradient(45deg,#3b82f6,#06b6d4); color:white; font-weight:bold; cursor:pointer; }
+button:hover{ transform:scale(1.05); }
+#turnIndicator{ font-size:22px; margin:5px; color:#facc15; }
+</style>
+</head>
+<body>
+
+<header>🎱 Mini Kulečník PvC</header>
+<div id="turnIndicator">Tah: Hráč</div>
+<div class="scoreboard">
+  Hráč: <span id="playerScore">0</span> | Počítač: <span id="aiScore">0</span> | Highscore: <span id="highscore">0</span>
+</div>
+
+<canvas id="game" width="800" height="500"></canvas>
+<div>
+  <button onclick="startGame()">Start / Restart</button>
+  <button onclick="goMenu()">⬅️ Zpět do menu</button>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let yellowBall, redBalls=[], pockets=[];
+let playerScore=0, aiScore=0, highscore=Number(localStorage.getItem("highscore")||0);
+let currentTurn="player";
+let aiming=false, mouse={x:0,y:0};
+let gameRunning=false;
+
+const turnIndicator = document.getElementById("turnIndicator");
+
+// --- Pockets ---
+function createPockets(){
+    pockets = [
+        {x:30, y:30},{x:canvas.width-30, y:30},
+        {x:30, y:canvas.height-30},{x:canvas.width-30, y:canvas.height-30},
+        {x:canvas.width/2, y:30},{x:canvas.width/2, y:canvas.height-30}
+    ];
+}
+
+// --- Start / Restart ---
+function startGame(){
+    yellowBall = {x:400, y:250, vx:0, vy:0, r:15, color:"#facc15"};
+    redBalls=[];
+    for(let i=0;i<15;i++){
+        redBalls.push({
+            x:Math.random()*700+50,
+            y:Math.random()*400+50,
+            vx:0, vy:0,
+            r:15,
+            color:"#ef4444",
+            pocketed:false
+        });
+    }
+    playerScore=0; aiScore=0;
+    currentTurn="player";
+    turnIndicator.innerText="Tah: Hráč";
+    gameRunning=true;
+    createPockets();
+    updateScore();
+    requestAnimationFrame(gameLoop);
+}
+
+// --- Game Loop ---
+function gameLoop(){
+    if(!gameRunning) return;
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// --- Update ---
+function update(){
+    // pohyb žluté koule
+    yellowBall.x += yellowBall.vx;
+    yellowBall.y += yellowBall.vy;
+    yellowBall.vx *= 0.98;
+    yellowBall.vy *= 0.98;
+    
+    // odrazy od stěn
+    if(yellowBall.x-yellowBall.r<0){ yellowBall.x=yellowBall.r; yellowBall.vx*=-1; }
+    if(yellowBall.x+yellowBall.r>canvas.width){ yellowBall.x=canvas.width-yellowBall.r; yellowBall.vx*=-1; }
+    if(yellowBall.y-yellowBall.r<0){ yellowBall.y=yellowBall.r; yellowBall.vy*=-1; }
+    if(yellowBall.y+yellowBall.r>canvas.height){ yellowBall.y=canvas.height-yellowBall.r; yellowBall.vy*=-1; }
+
+    // pohyb červených koulí
+    redBalls.forEach(b=>{
+        if(!b.pocketed){
+            b.x += b.vx;
+            b.y += b.vy;
+            b.vx *= 0.98;
+            b.vy *= 0.98;
+            
+            // odrazy od stěn
+            if(b.x-b.r<0){ b.x=b.r; b.vx*=-1; }
+            if(b.x+b.r>canvas.width){ b.x=canvas.width-b.r; b.vx*=-1; }
+            if(b.y-b.r<0){ b.y=b.r; b.vy*=-1; }
+            if(b.y+b.r>canvas.height){ b.y=canvas.height-b.r; b.vy*=-1; }
+        }
+    });
+
+    // odrazy červené od žluté
+    redBalls.forEach(b=>{
+        if(!b.pocketed){
+            let dx=b.x-yellowBall.x;
+            let dy=b.y-yellowBall.y;
+            let dist=Math.sqrt(dx*dx+dy*dy);
+            if(dist<yellowBall.r+b.r){
+                let angle=Math.atan2(dy,dx);
+                let speed=Math.sqrt(yellowBall.vx**2+yellowBall.vy**2);
+                b.vx=Math.cos(angle)*speed;
+                b.vy=Math.sin(angle)*speed;
+            }
+        }
+    });
+
+    // kontrola jamky
+    redBalls.forEach(b=>{
+        if(!b.pocketed){
+            pockets.forEach(p=>{
+                let dx=b.x-p.x, dy=b.y-p.y;
+                if(Math.sqrt(dx*dx+dy*dy)<b.r+20){
+                    b.pocketed=true;
+                    if(currentTurn==="player") playerScore++;
+                    else aiScore++;
+                    if(playerScore>highscore){ highscore=playerScore; localStorage.setItem("highscore",highscore);}
+                    if(aiScore>highscore){ highscore=aiScore; localStorage.setItem("highscore",highscore);}
+                    checkEndGame();
+                    updateScore();
+                }
+            });
+        }
+    });
+
+    // AI tah - čeká dokud se koule nehýbou
+    if(currentTurn==="ai" && Math.abs(yellowBall.vx)<0.1 && Math.abs(yellowBall.vy)<0.1){
+        aiShoot();
+    }
+}
+
+// --- Draw ---
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    // jamky
+    pockets.forEach(p=>{
+        ctx.fillStyle="#000";
+        ctx.beginPath();
+        ctx.arc(p.x,p.y,20,0,Math.PI*2);
+        ctx.fill();
+    });
+    // červené koule
+    redBalls.forEach(b=>{
+        if(!b.pocketed){
+            ctx.fillStyle=b.color;
+            ctx.beginPath();
+            ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+            ctx.fill();
+        }
+    });
+    // žlutá koule
+    ctx.fillStyle=yellowBall.color;
+    ctx.beginPath();
+    ctx.arc(yellowBall.x,yellowBall.y,yellowBall.r,0,Math.PI*2);
+    ctx.fill();
+
+    // aiming čára
+    if(aiming && currentTurn==="player"){
+        ctx.strokeStyle="#facc15";
+        ctx.beginPath();
+        ctx.moveTo(yellowBall.x,yellowBall.y);
+        ctx.lineTo(mouse.x,mouse.y);
+        ctx.stroke();
+    }
+}
+
+// --- Mouse ---
+canvas.addEventListener("mousedown", e=>{ if(currentTurn==="player") aiming=true; });
+canvas.addEventListener("mouseup", e=>{
+    if(currentTurn==="player" && aiming){
+        let rect=canvas.getBoundingClientRect();
+        let dx=mouse.x-yellowBall.x;
+        let dy=mouse.y-yellowBall.y;
+        yellowBall.vx=dx/15;
+        yellowBall.vy=dy/15;
+        aiming=false;
+        currentTurn="ai";
+        turnIndicator.innerText="Tah: Počítač";
+    }
+});
+canvas.addEventListener("mousemove", e=>{
+    const rect=canvas.getBoundingClientRect();
+    mouse.x=e.clientX-rect.left;
+    mouse.y=e.clientY-rect.top;
+});
+
+// --- AI ---
+function aiShoot(){
+    let target = redBalls.filter(b=>!b.pocketed)[Math.floor(Math.random()*redBalls.filter(b=>!b.pocketed).length)];
+    let pocket = pockets[Math.floor(Math.random()*pockets.length)];
+    yellowBall.vx=(pocket.x-yellowBall.x)/50;
+    yellowBall.vy=(pocket.y-yellowBall.y)/50;
+    setTimeout(()=>{
+        currentTurn="player";
+        turnIndicator.innerText="Tah: Hráč";
+    }, 1500);
+}
+
+// --- Score ---
+function updateScore(){
+    document.getElementById("playerScore").innerText=playerScore;
+    document.getElementById("aiScore").innerText=aiScore;
+    document.getElementById("highscore").innerText=highscore;
+}
+
+// --- End Game ---
+function checkEndGame(){
+    if(redBalls.every(b=>b.pocketed)){
+        gameRunning=false;
+        let winner = playerScore>aiScore?"Hráč vyhrál!":playerScore<aiScore?"Počítač vyhrál!":"Remíza!";
+        setTimeout(()=>alert("Konec hry! "+winner),100);
+    }
+}
+
+// --- Menu ---
+function goMenu(){ window.location.href="index.html"; }
+
+startGame();
+</script>
+
+</body>
+</html>
