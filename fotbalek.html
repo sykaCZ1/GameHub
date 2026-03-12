@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>Mini Fotbálek</title>
+<style>
+body{
+margin:0;
+background:linear-gradient(#0f172a,#1e293b);
+font-family:Arial;
+color:white;
+text-align:center;
+}
+
+h1{margin:10px;}
+
+canvas{
+background:#065f46;
+border:4px solid white;
+border-radius:10px;
+display:block;
+margin:10px auto;
+}
+
+.panel{
+margin-top:10px;
+}
+
+button{
+padding:8px 16px;
+margin:5px;
+border:none;
+border-radius:8px;
+background:#3b82f6;
+color:white;
+font-weight:bold;
+cursor:pointer;
+}
+
+button:hover{background:#2563eb;}
+
+.score{
+font-size:20px;
+margin:5px;
+}
+
+.timer{
+font-size:18px;
+color:#facc15;
+}
+
+.goalAnim{
+position:fixed;
+top:40%;
+left:50%;
+transform:translate(-50%,-50%) scale(0);
+font-size:80px;
+font-weight:bold;
+color:#facc15;
+text-shadow:0 0 20px #fff;
+opacity:0;
+pointer-events:none;
+}
+
+.goalAnim.show{
+animation:goalPop 1.2s ease-out;
+}
+
+@keyframes goalPop{
+0%{transform:translate(-50%,-50%) scale(0);opacity:0;}
+40%{transform:translate(-50%,-50%) scale(1.3);opacity:1;}
+70%{transform:translate(-50%,-50%) scale(1);}
+100%{transform:translate(-50%,-50%) scale(0);opacity:0;}
+}
+</style>
+</head>
+<body>
+
+<h1>⚽ Mini Fotbálek</h1>
+
+<div class="score">
+Ty: <span id="p1">0</span> | Počítač: <span id="p2">0</span>
+</div>
+
+<div class="timer">Čas: <span id="time">90</span>s</div>
+
+<canvas id="game" width="1000" height="600"></canvas>
+
+<div class="panel">
+<button onclick="restartGame()">🔄 Restart hry</button>
+<button onclick="centerBall()">⚽ Míč doprostřed</button>
+<button onclick="goMenu()">⬅️ Zpět do menu</button>
+</div>
+
+<div id="goalText" class="goalAnim">GÓÓÓL!</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+let player={x:120,y:300,r:22,color:"#3b82f6",speed:2.2};
+let cpu={x:880,y:300,r:22,color:"#ef4444",speed:2};
+let ball={x:500,y:300,r:12,vx:0,vy:0};
+
+let keys={};
+let score1=0, score2=0;
+let timeLeft=90;
+let playing=true;
+
+const goalWidth=180;
+const goalDepth=20;
+
+document.addEventListener("keydown",e=>keys[e.key]=true);
+document.addEventListener("keyup",e=>keys[e.key]=false);
+
+function drawField(){
+ctx.fillStyle="#065f46";
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ctx.strokeStyle="white";
+ctx.lineWidth=3;
+ctx.strokeRect(0,0,canvas.width,canvas.height);
+
+ctx.beginPath();
+ctx.moveTo(canvas.width/2,0);
+ctx.lineTo(canvas.width/2,canvas.height);
+ctx.stroke();
+
+ctx.beginPath();
+ctx.arc(canvas.width/2,canvas.height/2,90,0,Math.PI*2);
+ctx.stroke();
+
+ctx.fillStyle="#111";
+ctx.fillRect(0,canvas.height/2-goalWidth/2,goalDepth,goalWidth);
+ctx.fillRect(canvas.width-goalDepth,canvas.height/2-goalWidth/2,goalDepth,goalWidth);
+}
+
+function drawCircle(o){
+ctx.fillStyle=o.color||"white";
+ctx.beginPath();
+ctx.arc(o.x,o.y,o.r,0,Math.PI*2);
+ctx.fill();
+}
+
+function movePlayers(){
+if(keys["w"]) player.y-=player.speed;
+if(keys["s"]) player.y+=player.speed;
+if(keys["a"]) player.x-=player.speed;
+if(keys["d"]) player.x+=player.speed;
+
+player.x=Math.max(player.r,Math.min(canvas.width-player.r,player.x));
+player.y=Math.max(player.r,Math.min(canvas.height-player.r,player.y));
+
+if(cpu.y<ball.y) cpu.y+=cpu.speed;
+else cpu.y-=cpu.speed;
+}
+
+function kickBall(p){
+let dx=ball.x-p.x;
+let dy=ball.y-p.y;
+let dist=Math.sqrt(dx*dx+dy*dy);
+if(dist<p.r+ball.r){
+ball.vx=dx*0.35;
+ball.vy=dy*0.35;
+}
+}
+
+function moveBall(){
+ball.x+=ball.vx;
+ball.y+=ball.vy;
+
+ball.vx*=0.992;
+ball.vy*=0.992;
+
+// Opravené odrazy proti zaseknutí
+if(ball.x - ball.r <= 0){
+    ball.x = ball.r;
+    ball.vx = Math.abs(ball.vx) + 0.2;
+}
+if(ball.x + ball.r >= canvas.width){
+    ball.x = canvas.width - ball.r;
+    ball.vx = -Math.abs(ball.vx) - 0.2;
+}
+if(ball.y - ball.r <= 0){
+    ball.y = ball.r;
+    ball.vy = Math.abs(ball.vy) + 0.2;
+}
+if(ball.y + ball.r >= canvas.height){
+    ball.y = canvas.height - ball.r;
+    ball.vy = -Math.abs(ball.vy) - 0.2;
+}
+
+const minSpeed = 0.6;
+if(Math.abs(ball.vx) < minSpeed) ball.vx += (ball.vx >= 0 ? minSpeed : -minSpeed);
+if(Math.abs(ball.vy) < minSpeed) ball.vy += (ball.vy >= 0 ? minSpeed : -minSpeed);
+}
+
+function checkGoal(){
+if(ball.x<goalDepth && ball.y>canvas.height/2-goalWidth/2 && ball.y<canvas.height/2+goalWidth/2){
+score2++; showGoal(); resetPositions();
+}
+if(ball.x>canvas.width-goalDepth && ball.y>canvas.height/2-goalWidth/2 && ball.y<canvas.height/2+goalWidth/2){
+score1++; showGoal(); resetPositions();
+}
+document.getElementById("p1").innerText=score1;
+document.getElementById("p2").innerText=score2;
+}
+
+function showGoal(){
+let g=document.getElementById("goalText");
+g.classList.add("show");
+setTimeout(()=>g.classList.remove("show"),1200);
+}
+
+function resetPositions(){
+ball.x=500; ball.y=300; ball.vx=0; ball.vy=0;
+player.x=120; player.y=300;
+cpu.x=880; cpu.y=300;
+}
+
+function centerBall(){
+ball.x=500; ball.y=300; ball.vx=0; ball.vy=0;
+}
+
+function restartGame(){
+score1=0; score2=0; timeLeft=90; playing=true;
+resetPositions();
+}
+
+function goMenu(){ window.location.href="index.html"; }
+
+function timerTick(){
+if(!playing) return;
+timeLeft--;
+document.getElementById("time").innerText=timeLeft;
+if(timeLeft<=0){
+playing=false;
+alert(score1>score2?"Vyhrál jsi!":"Počítač vyhrál!");
+}
+}
+
+function gameLoop(){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+drawField();
+
+if(playing){
+movePlayers();
+kickBall(player);
+kickBall(cpu);
+moveBall();
+checkGoal();
+}
+
+drawCircle(player);
+drawCircle(cpu);
+drawCircle(ball);
+
+requestAnimationFrame(gameLoop);
+}
+
+setInterval(timerTick,1000);
+gameLoop();
+</script>
+
+</body>
+</html>

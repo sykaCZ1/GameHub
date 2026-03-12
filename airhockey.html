@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Air Hockey</title>
+<style>
+body{
+  margin:0;
+  font-family:'Segoe UI',sans-serif;
+  background:linear-gradient(135deg,#0f172a,#1e293b);
+  color:white;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:10px;
+}
+
+header{
+  font-size:32px;
+  margin-bottom:10px;
+  text-shadow:2px 2px 6px #000;
+}
+
+canvas{
+  background:#111827;
+  border:3px solid #3b82f6;
+  border-radius:12px;
+}
+
+.scoreboard{
+  font-size:20px;
+  margin:10px;
+  color:#38bdf8;
+}
+
+button{
+  margin:5px;
+  padding:10px 20px;
+  border:none;
+  border-radius:12px;
+  background:linear-gradient(45deg,#3b82f6,#06b6d4);
+  color:white;
+  font-weight:bold;
+  cursor:pointer;
+  transition:0.2s;
+}
+button:hover{
+  transform:scale(1.05);
+}
+</style>
+</head>
+<body>
+
+<header>🏒 Air Hockey - 5 vítězných bodů</header>
+
+<div class="scoreboard">
+Ty: <span id="playerScore">0</span> | AI: <span id="aiScore">0</span>
+</div>
+
+<canvas id="game" width="700" height="500"></canvas>
+
+<div>
+  <button onclick="startGame()">Start / Restart</button>
+  <button onclick="goMenu()">⬅️ Zpět do menu</button>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let playerScore = 0;
+let aiScore = 0;
+const winScore = 5; // počet vítězných bodů
+
+let gameInterval;
+let gameRunning = false;
+
+// --- Pálky ---
+const paddleRadius = 30;
+let player = {x: canvas.width/2, y: canvas.height - 50, radius: paddleRadius};
+let ai = {x: canvas.width/2, y: 50, radius: paddleRadius};
+
+// --- Puk ---
+const puckRadius = 15;
+let puck = {x:canvas.width/2, y:canvas.height/2, vx:6, vy:6};
+
+// --- Branky ---
+const goalWidth = 200;
+const goalHeight = 10;
+
+// --- Start / Restart ---
+function startGame(){
+    clearInterval(gameInterval);
+    playerScore=0;
+    aiScore=0;
+    puck.x=canvas.width/2;
+    puck.y=canvas.height/2;
+    puck.vx=6*(Math.random()>0.5?1:-1);
+    puck.vy=6*(Math.random()>0.5?1:-1);
+    gameRunning=true;
+    updateScore();
+    gameInterval = setInterval(gameLoop,20);
+}
+
+// --- Game Loop ---
+function gameLoop(){
+    if(!gameRunning) return;
+
+    // pohyb puku
+    puck.x += puck.vx;
+    puck.y += puck.vy;
+
+    // kolize s bočními stěnami
+    if(puck.x - puckRadius < 0 || puck.x + puckRadius > canvas.width) puck.vx *= -1;
+
+    // kolize s pálkami
+    checkCollision(player);
+    checkCollision(ai);
+
+    // skóre při trefení branky
+    if(puck.y - puckRadius <= goalHeight){
+        if(puck.x > canvas.width/2 - goalWidth/2 && puck.x < canvas.width/2 + goalWidth/2){
+            // hráč skóruje
+            playerScore++;
+            resetPuck();
+        } else {
+            puck.vy *= -1; // odraz mimo branku
+        }
+    }
+
+    if(puck.y + puckRadius >= canvas.height - goalHeight){
+        if(puck.x > canvas.width/2 - goalWidth/2 && puck.x < canvas.width/2 + goalWidth/2){
+            // AI skóruje
+            aiScore++;
+            resetPuck();
+        } else {
+            puck.vy *= -1; // odraz mimo branku
+        }
+    }
+
+    // AI pohyb
+    if(puck.x < ai.x) ai.x -= 5;
+    if(puck.x > ai.x) ai.x += 5;
+    ai.x = Math.max(ai.radius, Math.min(canvas.width - ai.radius, ai.x));
+
+    draw();
+    updateScore();
+    checkWin();
+}
+
+// --- Kolize ---
+function checkCollision(paddle){
+    let dx = puck.x - paddle.x;
+    let dy = puck.y - paddle.y;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+    if(dist < puckRadius + paddle.radius){
+        // odraz
+        let angle = Math.atan2(dy, dx);
+        let speed = Math.sqrt(puck.vx*puck.vx + puck.vy*puck.vy) * 1.05; // lehce zrychlí po odrazu
+        puck.vx = speed * Math.cos(angle);
+        puck.vy = speed * Math.sin(angle);
+        // posun puku mimo pálku
+        let overlap = puckRadius + paddle.radius - dist;
+        puck.x += Math.cos(angle)*overlap;
+        puck.y += Math.sin(angle)*overlap;
+    }
+}
+
+// --- Reset puku ---
+function resetPuck(){
+    puck.x = canvas.width/2;
+    puck.y = canvas.height/2;
+    puck.vx = 6*(Math.random()>0.5?1:-1);
+    puck.vy = 6*(Math.random()>0.5?1:-1);
+}
+
+// --- Draw ---
+function draw(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // středový pruh
+    ctx.strokeStyle = "#facc15";
+    ctx.setLineDash([15,15]);
+    ctx.beginPath();
+    ctx.moveTo(0,canvas.height/2);
+    ctx.lineTo(canvas.width,canvas.height/2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // branky
+    ctx.fillStyle = "#22c55e";
+    ctx.fillRect(canvas.width/2 - goalWidth/2, 0, goalWidth, goalHeight); // horní branka (AI)
+    ctx.fillRect(canvas.width/2 - goalWidth/2, canvas.height - goalHeight, goalWidth, goalHeight); // dolní branka (hráč)
+
+    // pálky
+    ctx.fillStyle="#3b82f6";
+    ctx.beginPath();
+    ctx.arc(player.x,player.y,player.radius,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle="#ef4444";
+    ctx.beginPath();
+    ctx.arc(ai.x,ai.y,ai.radius,0,Math.PI*2);
+    ctx.fill();
+
+    // puk
+    ctx.fillStyle="#f59e0b";
+    ctx.beginPath();
+    ctx.arc(puck.x,puck.y,puckRadius,0,Math.PI*2);
+    ctx.fill();
+}
+
+// --- Skóre ---
+function updateScore(){
+    document.getElementById("playerScore").innerText = playerScore;
+    document.getElementById("aiScore").innerText = aiScore;
+}
+
+// --- Player controls ---
+canvas.addEventListener("mousemove", (e)=>{
+    const rect = canvas.getBoundingClientRect();
+    player.x = e.clientX - rect.left;
+    player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, player.x));
+});
+
+// --- Win check ---
+function checkWin(){
+    if(playerScore >= winScore){
+        gameRunning=false;
+        clearInterval(gameInterval);
+        alert("Vyhrál jsi! 🎉");
+    } else if(aiScore >= winScore){
+        gameRunning=false;
+        clearInterval(gameInterval);
+        alert("Prohrál jsi 😢");
+    }
+}
+
+// --- Menu ---
+function goMenu(){ window.location.href="index.html"; }
+</script>
+
+</body>
+</html>

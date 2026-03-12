@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memory Match</title>
+<style>
+body{
+margin:0;
+font-family:'Segoe UI',sans-serif;
+background:linear-gradient(120deg,#1f2937,#111827);
+color:white;
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:flex-start;
+padding:20px;
+}
+h1{
+text-shadow:2px 2px 6px #000;
+}
+.board{
+display:grid;
+grid-gap:15px;
+margin-top:20px;
+}
+.card{
+width:80px;
+height:80px;
+background:linear-gradient(45deg,#3b82f6,#06b6d4);
+border-radius:12px;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:36px;
+cursor:pointer;
+user-select:none;
+transition:0.3s;
+}
+.card.flipped{
+background:#facc15;
+color:black;
+}
+.scoreboard{
+margin-top:15px;
+font-size:20px;
+color:#38bdf8;
+}
+button{
+margin-top:15px;
+padding:10px 20px;
+border:none;
+border-radius:12px;
+background:linear-gradient(45deg,#3b82f6,#06b6d4);
+color:white;
+font-weight:bold;
+cursor:pointer;
+transition:0.2s;
+}
+button:hover{
+transform:scale(1.05);
+}
+.levelSelect button{
+margin:5px;
+}
+</style>
+</head>
+<body>
+
+<h1>🧠 Memory Match</h1>
+
+<div id="levelSelect" class="levelSelect">
+<h2>Vyber velikost pole</h2>
+<button onclick="startGame(4)">4x4 (Snadné)</button>
+<button onclick="startGame(6)">6x6 (Těžké)</button>
+</div>
+
+<div class="scoreboard" id="scoreboard" style="display:none;">Body: <span id="score">0</span></div>
+<div class="board" id="board"></div>
+<button onclick="goMenu()" style="display:none;">⬅️ Zpět do menu</button>
+<button onclick="restartGame()" style="display:none;">Restart</button>
+
+<script>
+// ----------------- Setup -----------------
+let score = 0;
+let size = 4; // default
+let cards = [];
+let flipped = [];
+let matched = [];
+const emojis=["😀","😎","🤩","🤑","👑","🌟","🎯","🚀","🐶","🐱","🐼","🦊","🦄","🍎","🍌","🍇","🍓","🍉","⚽","🏀"];
+
+function startGame(selectedSize){
+    size = selectedSize;
+    document.getElementById('levelSelect').style.display = 'none';
+    document.getElementById('scoreboard').style.display = 'block';
+    document.querySelector('button[onclick="goMenu()"]').style.display='inline-block';
+    document.querySelector('button[onclick="restartGame()"]').style.display='inline-block';
+    initBoard();
+}
+
+// ----------------- Init Board -----------------
+function initBoard(){
+    cards = [];
+    flipped = [];
+    matched = [];
+    score = 0;
+    document.getElementById("score").innerText=score;
+    const totalPairs = (size*size)/2;
+    let usedEmojis = emojis.slice(0,totalPairs);
+    usedEmojis = [...usedEmojis,...usedEmojis]; // 2x pro páry
+    usedEmojis.sort(()=>Math.random()-0.5);
+    for(let e of usedEmojis){
+        cards.push({emoji:e, flipped:false});
+    }
+    renderBoard();
+}
+
+// ----------------- Render Board -----------------
+function renderBoard(){
+    const board=document.getElementById("board");
+    board.innerHTML="";
+    board.style.gridTemplateColumns = `repeat(${size},80px)`;
+    board.style.gridTemplateRows = `repeat(${size},80px)`;
+    cards.forEach((c,i)=>{
+        const div=document.createElement("div");
+        div.className="card";
+        if(c.flipped || matched.includes(i)){
+            div.classList.add("flipped");
+            div.innerText=c.emoji;
+        } else {
+            div.innerText="";
+        }
+        div.onclick=()=>flipCard(i);
+        board.appendChild(div);
+    });
+}
+
+// ----------------- Flip Logic -----------------
+function flipCard(index){
+    if(flipped.length>=2 || flipped.includes(index) || matched.includes(index)) return;
+    cards[index].flipped = true;
+    flipped.push(index);
+    renderBoard();
+    if(flipped.length===2){
+        setTimeout(checkMatch,500);
+    }
+}
+
+function checkMatch(){
+    const [a,b] = flipped;
+    if(cards[a].emoji === cards[b].emoji){
+        matched.push(a,b);
+        score += 10;
+    } else {
+        cards[a].flipped = false;
+        cards[b].flipped = false;
+    }
+    flipped = [];
+    renderBoard();
+    document.getElementById("score").innerText = score;
+
+    // pokud jsou všechny páry odhaleny
+    if(matched.length===cards.length){
+        alert("Gratulace! Vyhráli jste tuto hru.");
+        initBoard();
+    }
+}
+
+// ----------------- Controls -----------------
+function goMenu(){ window.location.href="index.html"; }
+function restartGame(){ initBoard(); }
+
+</script>
+</body>
+</html>

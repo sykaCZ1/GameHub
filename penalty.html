@@ -1,0 +1,199 @@
+```html
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Penalty</title>
+
+<style>
+
+body{
+margin:0;
+background:linear-gradient(135deg,#0f172a,#1e293b);
+font-family:Arial,Helvetica,sans-serif;
+color:white;
+display:flex;
+flex-direction:column;
+align-items:center;
+padding-top:30px;
+}
+
+h1{
+margin-bottom:10px;
+}
+
+canvas{
+background:#065f46;
+border:3px solid #38bdf8;
+box-shadow:0 0 20px rgba(0,0,0,0.5);
+cursor:pointer;
+}
+
+.score{
+margin-top:15px;
+font-size:20px;
+}
+
+.info{
+margin-top:5px;
+opacity:0.8;
+}
+
+button{
+margin-top:20px;
+padding:10px 20px;
+border:none;
+border-radius:8px;
+background:#3b82f6;
+color:white;
+cursor:pointer;
+}
+
+button:hover{
+background:#2563eb;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>⚽ Penalty</h1>
+
+<canvas id="game" width="500" height="300"></canvas>
+
+<div class="score">
+Ty: <span id="playerScore">0</span> |
+Počítač: <span id="aiScore">0</span>
+</div>
+
+<div class="info" id="info">
+Klikni do brány kam chceš kopnout
+</div>
+
+<button onclick="location.href='index.html'">Zpět na menu</button>
+
+<script>
+
+const canvas = document.getElementById("game")
+const ctx = canvas.getContext("2d")
+
+let playerScore = 0
+let aiScore = 0
+let round = 0
+let mode = "shoot" // shoot nebo defend
+
+const zones = ["left","center","right"]
+
+function drawGoal(){
+
+ctx.fillStyle="#065f46"
+ctx.fillRect(0,0,canvas.width,canvas.height)
+
+// brána
+ctx.fillStyle="white"
+ctx.fillRect(100,40,300,10)
+ctx.fillRect(100,40,10,120)
+ctx.fillRect(390,40,10,120)
+
+// rozdělení zón
+ctx.strokeStyle="white"
+ctx.beginPath()
+ctx.moveTo(200,40)
+ctx.lineTo(200,160)
+ctx.stroke()
+
+ctx.beginPath()
+ctx.moveTo(300,40)
+ctx.lineTo(300,160)
+ctx.stroke()
+
+}
+
+drawGoal()
+
+canvas.addEventListener("click",(e)=>{
+
+let rect = canvas.getBoundingClientRect()
+let x = e.clientX - rect.left
+
+let choice
+
+if(x < 200){
+choice="left"
+}else if(x < 300){
+choice="center"
+}else{
+choice="right"
+}
+
+if(mode === "shoot"){
+
+let ai = zones[Math.floor(Math.random()*3)]
+
+if(choice !== ai){
+playerScore++
+document.getElementById("info").innerText="GÓL!"
+}else{
+document.getElementById("info").innerText="Brankář chytil!"
+}
+
+mode="defend"
+setTimeout(()=>{
+document.getElementById("info").innerText="Klikni kam skočí brankář"
+},1000)
+
+}else{
+
+let aiShot = zones[Math.floor(Math.random()*3)]
+
+if(choice === aiShot){
+document.getElementById("info").innerText="Chytil jsi!"
+}else{
+aiScore++
+document.getElementById("info").innerText="Počítač dal gól"
+}
+
+round++
+mode="shoot"
+
+setTimeout(()=>{
+document.getElementById("info").innerText="Klikni kam chceš kopnout"
+},1000)
+
+}
+
+document.getElementById("playerScore").innerText = playerScore
+document.getElementById("aiScore").innerText = aiScore
+
+if(round >= 5){
+
+setTimeout(()=>{
+
+if(playerScore > aiScore){
+alert("Vyhrál jsi!")
+}else if(aiScore > playerScore){
+alert("Vyhrál počítač!")
+}else{
+alert("Remíza!")
+}
+
+playerScore=0
+aiScore=0
+round=0
+
+document.getElementById("playerScore").innerText = 0
+document.getElementById("aiScore").innerText = 0
+
+},500)
+
+}
+
+})
+
+</script>
+
+</body>
+</html>
+```

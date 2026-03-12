@@ -1,0 +1,281 @@
+```html id="emojicase_modern"
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emoji Case</title>
+
+<style>
+body{
+margin:0;
+font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+background:linear-gradient(120deg,#1f2937,#111827);
+color:white;
+display:flex;
+flex-direction:column;
+align-items:center;
+padding:20px;
+}
+
+h1{
+margin-bottom:20px;
+text-shadow: 2px 2px 5px #000;
+}
+
+.balance{
+font-size:24px;
+margin-bottom:15px;
+padding:10px 20px;
+background:linear-gradient(90deg,#3b82f6,#06b6d4);
+border-radius:12px;
+box-shadow:0 4px 15px rgba(0,0,0,0.4);
+}
+
+button{
+padding:12px 20px;
+margin:5px;
+border:none;
+border-radius:12px;
+background:linear-gradient(45deg,#3b82f6,#06b6d4);
+color:white;
+font-weight:bold;
+cursor:pointer;
+box-shadow:0 4px 15px rgba(0,0,0,0.4);
+transition:0.2s;
+}
+
+button:hover{
+transform:scale(1.05);
+box-shadow:0 6px 20px rgba(0,0,0,0.5);
+}
+
+.case-result{
+margin-top:20px;
+font-size:24px;
+height:50px;
+display:flex;
+justify-content:center;
+align-items:center;
+background:rgba(255,255,255,0.05);
+padding:10px 20px;
+border-radius:12px;
+box-shadow:inset 0 0 10px rgba(255,255,255,0.1);
+min-width:220px;
+}
+
+.inventory{
+margin-top:25px;
+max-width:600px;
+width:100%;
+text-align:left;
+background:rgba(255,255,255,0.05);
+border-radius:12px;
+padding:15px;
+box-shadow:0 4px 15px rgba(0,0,0,0.4);
+}
+
+.item{
+margin-bottom:8px;
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:6px 10px;
+background:rgba(255,255,255,0.08);
+border-radius:8px;
+}
+
+.item button{
+padding:6px 10px;
+font-size:14px;
+border-radius:8px;
+background:linear-gradient(90deg,#ef4444,#f97316);
+}
+
+.possible{
+display:flex;
+flex-wrap:wrap;
+justify-content:center;
+margin-top:15px;
+background:rgba(255,255,255,0.05);
+padding:10px;
+border-radius:12px;
+box-shadow:0 4px 15px rgba(0,0,0,0.3);
+}
+
+.possible span{
+margin:4px;
+font-size:24px;
+opacity:0.6;
+transition:0.2s;
+}
+
+.possible span.highlight{
+opacity:1;
+transform:scale(1.6);
+}
+</style>
+</head>
+
+<body>
+
+<h1>📦 Emoji Case</h1>
+
+<div class="balance">💰 Peníze: <span id="money">100</span></div>
+
+<div>
+<button onclick="openCase()">Otevřít bednu (20)</button>
+<button onclick="openMiniCase()">Otevřít Mini Case (10)</button>
+<button onclick="clickMoney()">+1 peněz</button>
+<button onclick="goMenu()">⬅️ Zpět do menu</button>
+</div>
+
+<div class="case-result" id="result"></div>
+
+<h2>🎯 Co můžeš získat:</h2>
+<div class="possible" id="possible"></div>
+
+<h2>🗃️ Inventář</h2>
+<div class="inventory" id="inventory"></div>
+
+<script>
+
+// ----------------- START -----------------
+let money=Number(localStorage.getItem("money"))||100
+let inventory=JSON.parse(localStorage.getItem("inventory")||"[]")
+
+const rarities={
+"common": {count:20, sell:1},
+"rare": {count:10, sell:3},
+"super rare": {count:10, sell:5},
+"epic": {count:5, sell:8},
+"legendary": {count:3, sell:20},
+"ultra legendary": {count:2, sell:50}
+}
+
+const emojis=[]
+for(let r in rarities){
+for(let i=0;i<rarities[r].count;i++){
+let emoji = r==="common"?"😀": r==="rare"?"😎": r==="super rare"?"🤩": r==="epic"?"🤑": r==="legendary"?"👑":"🌟"
+emoji+="_"+i
+emojis.push({emoji:emoji,rarity:r,chance:1})
+}
+}
+
+// zobrazení možných emoji
+function showPossible(){
+const div=document.getElementById("possible")
+div.innerHTML=""
+emojis.forEach(e=>{
+const span=document.createElement("span")
+span.innerText=e.emoji
+div.appendChild(span)
+})
+}
+showPossible()
+
+// upravování šancí
+function adjustChances(obtainedRarity){
+emojis.forEach(e=>{
+if(e.rarity===obtainedRarity){
+e.chance*=0.9
+} else {
+e.chance*=1.02
+}
+})
+}
+
+// náhodný emoji podle šance
+function pickEmoji(){
+let total=emojis.reduce((sum,e)=>sum+e.chance,0)
+let rnd=Math.random()*total
+for(let e of emojis){
+if(rnd<e.chance) return e
+rnd-=e.chance
+}
+return emojis[0]
+}
+
+// aktualizace UI
+function updateUI(){
+document.getElementById("money").innerText=Math.floor(money)
+const inv=document.getElementById("inventory")
+inv.innerHTML=""
+inventory.forEach((i,index)=>{
+inv.innerHTML+=`<div class="item"><span>${i.emoji} (${i.rarity})</span><button onclick="sell(${index})">Prodat za ${rarities[i.rarity].sell}</button></div>`
+})
+}
+
+// otevření hlavní bedny
+function openCase(){
+if(money<20){alert("Nemáš dost peněz. Klikni +1 peněz!"); return}
+money-=20
+updateUI()
+animateCase(()=>{ 
+let e = pickEmoji()
+inventory.push(e)
+adjustChances(e.rarity)
+document.getElementById("result").innerText=`Získal jsi: ${e.emoji} (${e.rarity})`
+updateUI()
+save()
+})
+}
+
+// Mini Case – common nebo ultra legendary
+function openMiniCase(){
+if(money<10){alert("Nemáš dost peněz. Klikni +1 peněz!"); return}
+money-=10
+updateUI()
+animateCase(()=>{
+let r = Math.random()<0.02?"ultra legendary":"common"
+let emojiObj = emojis.find(e=>e.rarity===r)
+if(!emojiObj) emojiObj=emojis.find(e=>e.rarity==="common")
+inventory.push(emojiObj)
+document.getElementById("result").innerText=`Získal jsi: ${emojiObj.emoji} (${emojiObj.rarity})`
+updateUI()
+save()
+})
+}
+
+// animace bedny
+function animateCase(callback){
+const resultDiv=document.getElementById("result")
+let steps=12
+let interval=setInterval(()=>{
+const randomEmoji=emojis[Math.floor(Math.random()*emojis.length)]
+resultDiv.innerText=randomEmoji.emoji
+steps--
+if(steps<=0){clearInterval(interval); callback()}
+},80)
+}
+
+function sell(index){
+let item=inventory[index]
+money+=rarities[item.rarity].sell
+inventory.splice(index,1)
+updateUI()
+save()
+}
+
+function clickMoney(){
+money+=1
+updateUI()
+save()
+}
+
+function save(){
+localStorage.setItem("money",money)
+localStorage.setItem("inventory",JSON.stringify(inventory))
+}
+
+function goMenu(){
+window.location.href="index.html"
+}
+
+updateUI()
+
+</script>
+
+</body>
+</html>
+```

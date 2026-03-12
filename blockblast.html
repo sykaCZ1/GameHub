@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BlockBlast - GameHub</title>
+<style>
+body {
+  margin:0;
+  font-family:'Roboto', sans-serif;
+  background: linear-gradient(135deg,#0f172a,#1e293b);
+  color:white;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  min-height:100vh;
+}
+header{
+  width:100%;
+  padding:20px;
+  text-align:center;
+  font-size:32px;
+  font-weight:bold;
+  background:linear-gradient(90deg,#2563eb,#3b82f6);
+  border-radius:0 0 15px 15px;
+  margin-bottom:20px;
+  box-shadow:0 6px 15px rgba(0,0,0,0.4);
+}
+#scoreBoard{
+  font-size:20px;
+  font-weight:bold;
+  margin-bottom:10px;
+}
+#gameArea {
+  display:grid;
+  grid-template-columns: repeat(10, 40px);
+  grid-template-rows: repeat(10, 40px);
+  gap:2px;
+  background: rgba(30,41,59,0.9);
+  padding:5px;
+  border-radius:15px;
+  margin-bottom:20px;
+  box-shadow:0 6px 20px rgba(0,0,0,0.5);
+}
+.cell{
+  width:40px;
+  height:40px;
+  background:#1e293b;
+  border-radius:4px;
+  border:1px solid #334155;
+  position:relative;
+  transition: background 0.3s;
+}
+.cell.highlight-ok{ background: #16a34a; } /* lze umístit */
+.cell.highlight-no{ background: #dc2626; } /* nelze umístit */
+#blocksArea{
+  display:flex;
+  gap:15px;
+  margin-bottom:20px;
+  justify-content:center;
+}
+.blockBtn{
+  width:auto;
+  background:rgba(59,130,246,0.8);
+  border-radius:8px;
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  padding:5px;
+}
+.blockRow{
+  display:flex;
+}
+.blockCell{
+  width:20px;
+  height:20px;
+  margin:1px;
+  border-radius:3px;
+  background:#facc15;
+}
+.blockCell.empty{ background:transparent; }
+.blockBtn.dragging{ opacity:0.5; }
+button{
+  padding:10px 20px;
+  font-size:16px;
+  font-weight:bold;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+  background:#2563eb;
+  color:white;
+  margin:5px;
+  transition:0.3s;
+}
+button:hover{ background:#3b82f6; }
+/* Animace pro nový blok */
+@keyframes blockAppear{
+  0%{ transform: scale(0); opacity:0; }
+  100%{ transform: scale(1); opacity:1; }
+}
+.blockPlaced{
+  animation: blockAppear 0.3s ease-out;
+}
+/* Animace odstranění řady/sloupce */
+.cell.remove{
+  animation: fadeOut 0.5s forwards;
+}
+@keyframes fadeOut{
+  0%{ opacity:1; transform: scale(1);}
+  100%{ opacity:0; transform: scale(0);}
+}
+</style>
+</head>
+<body>
+
+<header>🏆 BlockBlast</header>
+<div id="scoreBoard">Body: 0</div>
+<div id="gameArea"></div>
+<div id="blocksArea"></div>
+<button onclick="restartGame()">Restart</button>
+<button onclick="backToHub()">Zpět do GameHub</button>
+
+<script>
+const gameArea = document.getElementById('gameArea');
+const blocksArea = document.getElementById('blocksArea');
+const scoreBoard = document.getElementById('scoreBoard');
+let grid=[];
+let score=0;
+let currentBlocks=[];
+
+// Hrací pole 10x10
+function createGrid(){
+  gameArea.innerHTML='';
+  grid=[];
+  for(let i=0;i<10;i++){
+    grid[i]=[];
+    for(let j=0;j<10;j++){
+      const cell=document.createElement('div');
+      cell.classList.add('cell');
+      cell.dataset.row=i;
+      cell.dataset.col=j;
+      gameArea.appendChild(cell);
+      grid[i][j]=0;
+    }
+  }
+}
+
+// Bloky
+const blockShapes=[
+  [[1]], [[1,1]], [[1],[1]], [[1,1],[1,1]], [[1,1,1]], [[1],[1],[1]], [[1,1],[0,1]]
+];
+
+// Vykreslení bloků dole
+function generateBlocks(){
+  blocksArea.innerHTML='';
+  currentBlocks=[];
+  for(let i=0;i<3;i++){
+    const shape=blockShapes[Math.floor(Math.random()*blockShapes.length)];
+    currentBlocks.push(shape);
+    const btn=document.createElement('div');
+    btn.classList.add('blockBtn');
+    btn.draggable=true;
+    btn.dataset.index=i;
+
+    shape.forEach(r=>{
+      const rowDiv=document.createElement('div');
+      rowDiv.classList.add('blockRow');
+      r.forEach(c=>{
+        const cellDiv=document.createElement('div');
+        cellDiv.classList.add('blockCell');
+        if(c===0) cellDiv.classList.add('empty');
+        rowDiv.appendChild(cellDiv);
+      });
+      btn.appendChild(rowDiv);
+    });
+
+    blocksArea.appendChild(btn);
+
+    btn.addEventListener('dragstart', e=>{
+      e.dataTransfer.setData('text/plain', i);
+      btn.classList.add('dragging');
+      highlightCells(i);
+    });
+    btn.addEventListener('dragend', e=>{
+      btn.classList.remove('dragging');
+      document.querySelectorAll('.cell').forEach(c=>{
+        c.classList.remove('highlight-ok','highlight-no');
+      });
+    });
+  }
+}
+
+// Zvýraznění polí při přetahování
+function highlightCells(blockIndex){
+  const shape=currentBlocks[blockIndex];
+  document.querySelectorAll('.cell').forEach(c=>{
+    const row=parseInt(c.dataset.row);
+    const col=parseInt(c.dataset.col);
+    if(canPlaceBlock(row,col,shape)){
+      c.classList.add('highlight-ok');
+    } else {
+      c.classList.add('highlight-no');
+    }
+  });
+}
+
+// Drag & Drop
+gameArea.addEventListener('dragover', e=>e.preventDefault());
+gameArea.addEventListener('drop', e=>{
+  e.preventDefault();
+  const index=parseInt(e.dataTransfer.getData('text/plain'));
+  const shape=currentBlocks[index];
+  const row=parseInt(e.target.dataset.row);
+  const col=parseInt(e.target.dataset.col);
+  if(placeBlock(row,col,shape)){
+    generateBlocks();
+    checkLinesAndColumns();
+    if(isGameOver()){
+      alert("Game Over! Konec hry.");
+      restartGame();
+    }
+  }
+  document.querySelectorAll('.cell').forEach(c=>{
+    c.classList.remove('highlight-ok','highlight-no');
+  });
+});
+
+function canPlaceBlock(row,col,block){
+  for(let i=0;i<block.length;i++){
+    for(let j=0;j<block[i].length;j++){
+      if(block[i][j]===1){
+        if(row+i>=10 || col+j>=10 || grid[row+i][col+j]===1) return false;
+      }
+    }
+  }
+  return true;
+}
+
+// Umístění bloku
+function placeBlock(row,col,block){
+  if(!canPlaceBlock(row,col,block)) return false;
+  for(let i=0;i<block.length;i++){
+    for(let j=0;j<block[i].length;j++){
+      if(block[i][j]===1){
+        grid[row+i][col+j]=1;
+        const cell=document.querySelector(`.cell[data-row='${row+i}'][data-col='${col+j}']`);
+        cell.style.background='#facc15';
+        cell.classList.add('blockPlaced');
+        setTimeout(()=>cell.classList.remove('blockPlaced'),300);
+      }
+    }
+  }
+  return true;
+}
+
+// Kontrola řad a sloupců
+function checkLinesAndColumns(){
+  // Řady
+  for(let i=0;i<10;i++){
+    if(grid[i].every(v=>v===1)){
+      score+=10;
+      scoreBoard.textContent='Body: '+score;
+      for(let j=0;j<10;j++){
+        const cell=document.querySelector(`.cell[data-row='${i}'][data-col='${j}']`);
+        cell.classList.add('remove');
+        setTimeout(()=>{
+          cell.classList.remove('remove');
+          cell.style.background='#1e293b';
+          grid[i][j]=0;
+        },500);
+      }
+    }
+  }
+  // Sloupce
+  for(let j=0;j<10;j++){
+    if(grid.every(row=>row[j]===1)){
+      score+=10;
+      scoreBoard.textContent='Body: '+score;
+      for(let i=0;i<10;i++){
+        const cell=document.querySelector(`.cell[data-row='${i}'][data-col='${j}']`);
+        cell.classList.add('remove');
+        setTimeout(()=>{
+          cell.classList.remove('remove');
+          cell.style.background='#1e293b';
+          grid[i][j]=0;
+        },500);
+      }
+    }
+  }
+}
+
+// Kontrola Game Over
+function isGameOver(){
+  for(let i=0;i<currentBlocks.length;i++){
+    for(let row=0;row<10;row++){
+      for(let col=0;col<10;col++){
+        if(canPlaceBlock(row,col,currentBlocks[i])) return false;
+      }
+    }
+  }
+  return true;
+}
+
+function restartGame(){
+  score=0;
+  scoreBoard.textContent='Body: 0';
+  createGrid();
+  generateBlocks();
+}
+function backToHub(){ window.location.href='index.html'; }
+
+createGrid();
+generateBlocks();
+</script>
+
+</body>
+</html>

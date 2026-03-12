@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Racing - Animace a random eventy</title>
+<style>
+body{
+  margin:0;
+  font-family:'Segoe UI',sans-serif;
+  background:linear-gradient(180deg,#111827,#1e293b);
+  color:white;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:10px;
+}
+header{
+  font-size:32px;
+  margin:10px;
+  text-shadow:2px 2px 6px #000;
+}
+canvas{
+  background:#0f172a;
+  border:3px solid #3b82f6;
+  border-radius:12px;
+  margin-top:10px;
+}
+button{
+  margin:5px;
+  padding:8px 16px;
+  border:none;
+  border-radius:10px;
+  background:linear-gradient(45deg,#3b82f6,#06b6d4);
+  color:white;
+  font-weight:bold;
+  cursor:pointer;
+  transition:0.2s;
+}
+button:hover{
+  transform:scale(1.05);
+}
+.scoreboard{
+  margin-top:5px;
+  font-size:18px;
+  color:#38bdf8;
+}
+</style>
+</head>
+<body>
+
+<header>🏎️ Mini Racing</header>
+
+<audio id="bgmusic" loop autoplay>
+  <source src="tvuj_soubor.mp3" type="audio/mpeg">
+</audio>
+
+<canvas id="game" width="400" height="600"></canvas>
+
+<div class="scoreboard">
+Body: <span id="score">0</span> | High Score: <span id="highScore">0</span>
+</div>
+
+<div>
+<button id="startStopBtn">▶️ Spustit hru</button>
+<button id="restartBtn" style="display:none;">🔄 Restart hry</button>
+<button id="musicBtn">🔊 Hudba</button>
+<button onclick="goMenu()">⬅️ Zpět do menu</button>
+</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const music=document.getElementById("bgmusic");
+
+let player={x:180,y:500,width:40,height:60,speed:5,angle:0};
+let obstacles=[];
+let randomEvents=[];
+let score=0;
+let highScore=Number(localStorage.getItem("highScore")||0);
+let keys={};
+let gameRunning=false;
+let spawnTick=0;
+
+// Ovládání
+document.addEventListener("keydown",e=>keys[e.key]=true);
+document.addEventListener("keyup",e=>keys[e.key]=false);
+
+// Start/Stop
+document.getElementById("startStopBtn").onclick = ()=>{
+  gameRunning = !gameRunning;
+  document.getElementById("startStopBtn").innerText = gameRunning ? "⏸️ Zastavit hru" : "▶️ Spustit hru";
+  if(gameRunning) spawnTick=0;
+}
+
+// Restart tlačítko
+document.getElementById("restartBtn").onclick = ()=>{
+  score=0;
+  obstacles=[];
+  randomEvents=[];
+  gameRunning=true;
+  document.getElementById("restartBtn").style.display="none";
+  document.getElementById("startStopBtn").innerText="⏸️ Zastavit hru";
+}
+
+// Hudba ON/OFF
+document.getElementById("musicBtn").onclick = ()=>{
+  if(music.paused){ music.play(); document.getElementById("musicBtn").innerText="🔊 Hudba";}
+  else{ music.pause(); document.getElementById("musicBtn").innerText="🔇 Hudba";}
+}
+
+// Spawning překážek a random eventů
+function spawnObstacle(){
+  let width=Math.random()*80+30;
+  let x=Math.random()*(canvas.width-width);
+  obstacles.push({x:x,y:-30,width:width,height:30,speed:4+Math.random()*2});
+}
+
+// Random event: díra / kolce
+function spawnRandomEvent(){
+  let x=Math.random()*(canvas.width-30);
+  randomEvents.push({x:x,y:-30,width:30,height:30,speed:3});
+}
+
+function update(){
+  if(!gameRunning) return;
+
+  // pohyb hráče a rotace auta
+  if(keys["ArrowLeft"]){ player.x-=player.speed; player.angle=-15;}
+  else if(keys["ArrowRight"]){ player.x+=player.speed; player.angle=15;}
+  else { player.angle=0; }
+
+  player.x=Math.max(50,Math.min(canvas.width-50-player.width,player.x));
+
+  obstacles.forEach(o=>o.y+=o.speed);
+  randomEvents.forEach(r=>r.y+=r.speed);
+
+  // Body a kolize
+  obstacles.forEach((o,index)=>{
+    if(o.y>canvas.height){
+      score+=1;
+      spawnEffect(o.x,o.y);
+      obstacles.splice(index,1);
+      if(score>highScore){highScore=score;}
+    }
+    if(o.x<player.x+player.width && o.x+o.width>player.x &&
+       o.y<player.y+player.height && o.y+o.height>player.y){
+       endRun();
+    }
+  });
+
+  randomEvents.forEach((r,index)=>{
+    if(r.y>canvas.height) randomEvents.splice(index,1);
+    if(r.x<player.x+player.width && r.x+r.width>player.x &&
+       r.y<player.y+player.height && r.y+r.height>player.y){
+       score = Math.max(0, Math.floor(score*0.7)); // ztráta 30% bodů
+       randomEvents.splice(index,1);
+    }
+  });
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // silnice
+  ctx.fillStyle="#1f2937";
+  ctx.fillRect(50,0,canvas.width-100,canvas.height);
+
+  // pruhy
+  ctx.fillStyle="#facc15";
+  for(let i=0;i<canvas.height;i+=40){
+    ctx.fillRect(canvas.width/2-5,i,10,20);
+  }
+
+  // hráč s rotací
+  ctx.save();
+  ctx.translate(player.x+player.width/2,player.y+player.height/2);
+  ctx.rotate(player.angle*Math.PI/180);
+  ctx.fillStyle="#3b82f6";
+  ctx.fillRect(-player.width/2,-player.height/2,player.width,player.height);
+  ctx.restore();
+
+  // překážky
+  ctx.fillStyle="#ef4444";
+  obstacles.forEach(o=>ctx.fillRect(o.x,o.y,o.width,o.height));
+
+  // random eventy
+  ctx.fillStyle="#a3e635";
+  randomEvents.forEach(r=>ctx.fillRect(r.x,r.y,r.width,r.height));
+}
+
+// Efekt bodu
+function spawnEffect(x,y){
+  let alpha=1;
+  let offsetY=0;
+  const interval=setInterval(()=>{
+    ctx.clearRect(x-5,y-20-offsetY,40,40);
+    ctx.fillStyle=`rgba(250,204,21,${alpha})`;
+    ctx.font="20px Arial";
+    ctx.fillText("+1",x,y-offsetY);
+    alpha-=0.05;
+    offsetY+=1;
+    if(alpha<=0) clearInterval(interval);
+  },16);
+}
+
+// Konec hry
+function endRun(){
+  gameRunning=false;
+  obstacles=[];
+  randomEvents=[];
+  document.getElementById("restartBtn").style.display="inline-block";
+  document.getElementById("startStopBtn").style.display="none";
+  localStorage.setItem("highScore",highScore);
+  updateScoreboard();
+  alert("Konec běhu! Zkus to znovu.");
+}
+
+function updateScoreboard(){
+  document.getElementById("score").innerText=Math.floor(score);
+  document.getElementById("highScore").innerText=highScore;
+}
+
+// Hlavní smyčka
+function gameLoop(){
+  spawnTick++;
+  if(gameRunning && spawnTick%60===0) spawnObstacle();
+  if(gameRunning && spawnTick%180===0) spawnRandomEvent();
+  update();
+  draw();
+  updateScoreboard();
+  requestAnimationFrame(gameLoop);
+}
+function goMenu(){
+  window.location.href = "index.html";
+}
+
+gameLoop();
+</script>
+
+</body>
+</html>
